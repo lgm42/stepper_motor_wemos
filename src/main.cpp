@@ -62,6 +62,7 @@ void setup() {
   ArduinoOTA.begin();
 
   _paramsProvider.setup();
+  Serial.println("_paramProvider.params().motorStepNumber: " + String(_paramsProvider.params().motorStepNumber));
   _stepperManager.setup();
   _httpServer.setup();
   // pinMode(DIR, OUTPUT);
@@ -74,7 +75,7 @@ void setup() {
 
 void loop() {
   
-  Serial.println("loop...");
+  //Serial.println("loop...");
   ArduinoOTA.handle();
   _stepperManager.handle();
   _httpServer.handle();

@@ -27,8 +27,6 @@ HttpServer::~HttpServer()
 
 void HttpServer::setup(void)
 {
-	_paramProvider.loadSystemParameters();
-	
 	MDNS.begin(_paramProvider.systemParams().hostname.c_str()); 
 	MDNS.addService("http", "tcp", 80);
 
@@ -48,14 +46,28 @@ void HttpServer::setup(void)
 	
     _webServer.on("/startRotate", [&]() {
         Serial.println("REST: " + _webServer.uri());
-		String angle(_webServer.arg("angle"));
-        _stepper.startRotate(angle.toFloat());
-        sendOk();
+		if (_webServer.arg("absoluteAngle") != "")
+		{
+			String angle(_webServer.arg("absoluteAngle"));
+        	_stepper.startRotateAbsolute(angle.toFloat());
+			sendOk();
+		}
+		else if (_webServer.arg("relativeAngle") != "")
+		{
+			String angle(_webServer.arg("relativeAngle"));
+        	_stepper.startRotateRelative(angle.toFloat());
+			sendOk();
+		}
+		else
+		{
+			sendKo("Query must have parameter absoluteAngle or relativeAngle");
+		}
+        
     });
 
     _webServer.on("/position", [&]() {
 		Serial.println("REST: " + _webServer.uri());
-		String data = "{ \"position\" : " + String(_stepper.position(), 2) + "}";
+		String data = "{ \"position\" : " + String(_paramProvider.position(), 2) + "}";
         sendOkAnswerWithParams(data);
         sendOk();
     });
@@ -142,7 +154,7 @@ void HttpServer::updateNTP()
 void HttpServer::handle(void)
 {
 	_webServer.handleClient();
-	//_ftpServer.handleFTP();
+	_ftpServer.handleFTP();
     MDNS.update();
 }
 

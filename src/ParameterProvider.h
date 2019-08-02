@@ -6,14 +6,13 @@ class ParameterProvider
 {
   public:
 
-    typedef struct
+    struct Parameters
     {
-        int counterClockWizeAngleAmplitude;
-        int clockWizeAngleAmplitude;
-        int currentPosition;
+        double counterClockWizeAngleAmplitude;
+        double clockWizeAngleAmplitude;
         double reductionRate;
         double motorStepNumber;
-    } Parameters;
+    };
 
     typedef struct 
     {
@@ -35,6 +34,9 @@ class ParameterProvider
     void load();
     void save();
 
+    void loadPosition();
+    void savePosition();
+
     void createDefaultValues();
     Parameters & params();
 
@@ -42,9 +44,16 @@ class ParameterProvider
     SystemParameters & systemParams();
     const SystemParameters & systemParams() const ;
 
+    void position(const double angle);
+    double position() const;
+
   private:
+    ParameterProvider(const ParameterProvider & copy);
+
     Parameters _currentParameters;
     SystemParameters _currentSystemParameters;
+    double _currentPosition;
     static const String Filename;
+    static const String PositionFilename;
     static const String SystemFilename;
 };

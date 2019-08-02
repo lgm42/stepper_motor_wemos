@@ -16,13 +16,12 @@ class StepperManager
 
         bool moving() const;
 
-        void startRotate(const double angle);
+        void startRotateAbsolute(const double angle);
+        void startRotateRelative(const double angle);
         
         static StepperManager *Instance;
 
         void onTimer();
-
-        double position() const;
     private:
         typedef enum 
         {
@@ -30,13 +29,12 @@ class StepperManager
             kCounterClockWize = 1
         } Direction;
 
-        ParameterProvider _paramProvider;
+        ParameterProvider & _paramsProvider;
         Direction _direction;
-        int _stepsToObjective; 
-        double _currentAngle;
+        int _stepsToObjective;
 
         void setDirection();
-        int stepsToAngle(const int steps);
+        double stepsToAngle(const int steps);
 
         static const uint8_t DirectionPin;
         static const uint8_t StepPin;

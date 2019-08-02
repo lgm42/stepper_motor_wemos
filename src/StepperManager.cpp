@@ -13,8 +13,8 @@ void ICACHE_RAM_ATTR onTimerISR();
 
 StepperManager *StepperManager::Instance = NULL;
 
-StepperManager::StepperManager(ParameterProvider & paramProvider)
-	: _paramProvider(paramProvider), _currentAngle(0.0)
+StepperManager::StepperManager(ParameterProvider & paramsProvider)
+	: _paramsProvider(paramsProvider)
 {
 }
 
@@ -28,18 +28,19 @@ void StepperManager::setup()
     pinMode(StepPin, OUTPUT);
     pinMode(EnablePin, OUTPUT);
     digitalWrite(DirectionPin, 1);
-    digitalWrite(EnablePin, 0);
+    digitalWrite(EnablePin, 1);
 
     Instance = this;
     timer1_isr_init();
     timer1_attachInterrupt(onTimerISR);
-    timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
+    timer1_enable(TIM_DIV1, TIM_EDGE, TIM_SINGLE);
     timer1_write(80000); //1ms
 }
 
 void StepperManager::handle()
 {
     //TODO : save json if moving ?
+    Serial.println("progress angle: " + String(_paramsProvider.position()));
 }
 
 void ICACHE_RAM_ATTR onTimerISR()
@@ -53,23 +54,30 @@ void StepperManager::onTimer()
     {
         if (digitalRead(StepPin) == 0)
         {
-            digitalWrite(DirectionPin, 1);
+            digitalWrite(StepPin, 1);
         }
         else
         {
-            digitalWrite(DirectionPin, 0);
+            digitalWrite(StepPin, 0);
             //we reduce number of step by 1
             _stepsToObjective--;
-            _currentAngle += stepsToAngle(1);
+            _paramsProvider.position(_paramsProvider.position() + stepsToAngle(1));
+            if (_stepsToObjective == 0)
+            {
+                digitalWrite(EnablePin, 1);
+                Serial.println("finish, angle: " + String(_paramsProvider.position()));
+                _paramsProvider.savePosition();
+            }
+                
         }
     }
 
     timer1_write(80000); //1ms
 }
 
-int StepperManager::stepsToAngle(const int steps)
+double StepperManager::stepsToAngle(const int steps)
 {
-    return (steps * 360.0) / (_paramProvider.params().motorStepNumber * _paramProvider.params().reductionRate);
+    return (steps * 360.0) / (_paramsProvider.params().motorStepNumber * _paramsProvider.params().reductionRate);
 }
 
 bool StepperManager::moving() const
@@ -77,13 +85,25 @@ bool StepperManager::moving() const
     return _stepsToObjective != 0;
 }
 
-void StepperManager::startRotate(const double angle)
+void StepperManager::startRotateAbsolute(const double angle)
 {
     //we compute the number of step to do
-    double delta = angle - _currentAngle;
+    double delta = angle - _paramsProvider.position();
     _direction = (delta > 0?kClockWize:kCounterClockWize);
     setDirection();
-    _stepsToObjective = delta * (_paramProvider.params().motorStepNumber * _paramProvider.params().reductionRate) / 360.0;
+    digitalWrite(EnablePin, 0);
+    _stepsToObjective = abs(delta) * (_paramsProvider.params().motorStepNumber * _paramsProvider.params().reductionRate) / 360.0;
+    Serial.println("startRotate, absolute angle: " + String(angle) + ", steps: " + String(_stepsToObjective));
+}
+
+void StepperManager::startRotateRelative(const double angle)
+{
+    //we compute the number of step to do
+    _direction = (angle > 0?kClockWize:kCounterClockWize);
+    setDirection();
+    digitalWrite(EnablePin, 0);
+    _stepsToObjective = abs(angle) * (_paramsProvider.params().motorStepNumber * _paramsProvider.params().reductionRate) / 360.0;
+    Serial.println("startRotate, relative angle: " + String(angle) + ", steps: " + String(_stepsToObjective));
 }
 
 void StepperManager::setDirection()
@@ -98,9 +118,4 @@ void StepperManager::setDirection()
             digitalWrite(DirectionPin, 0);
             break;
     }
-}
-
-double StepperManager::position() const
-{
-    return _currentAngle;
 }

@@ -3,10 +3,14 @@
 
 #include "ParameterProvider.h"
 
-const String ParameterProvider::Filename = "parameters.json";
-const String ParameterProvider::SystemFilename = "system.json";
+const String ParameterProvider::Filename = "/parameters.json";
+const String ParameterProvider::PositionFilename = "/position.txt";
+const String ParameterProvider::SystemFilename = "/system.json";
 
 ParameterProvider::ParameterProvider()
+{}
+
+ParameterProvider::ParameterProvider(const ParameterProvider & copy)
 {}
 
 ParameterProvider::~ParameterProvider()
@@ -14,20 +18,40 @@ ParameterProvider::~ParameterProvider()
 
 void ParameterProvider::setup()
 {
-  SPIFFS.begin(); 
+  if (!SPIFFS.begin()) 
+  {
+    Serial.println("Unable to begin SPIFFS");
+  }
+  loadSystemParameters();
+  //TODO : remove when ok
+  createDefaultValues();
+  save();
+
+  load();
+
+  loadPosition();
 }
 
 void ParameterProvider::loadSystemParameters()
 {
   // Open file for reading
   File file = SPIFFS.open(SystemFilename, "r");
+  if (!file)
+  {
+    Serial.println("Exception during opening system configuration, resetting to factory settings");
+    createDefaultSystemValues();
+    saveSystemParameters();
+    return;
+  }
 
   DynamicJsonDocument doc(1024);
 
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
+    Serial.println("Exception during deserializing system configuration, resetting to factory settings");
     createDefaultSystemValues();
+    saveSystemParameters();
     return;
   }
 
@@ -41,9 +65,6 @@ void ParameterProvider::loadSystemParameters()
 
 void ParameterProvider::saveSystemParameters()
 {
-  // Delete existing file, otherwise the configuration is appended to the file
-  SPIFFS.remove(SystemFilename);
-
   // Open file for writing
   File file = SPIFFS.open(SystemFilename, "w");
   if (!file) {
@@ -52,13 +73,14 @@ void ParameterProvider::saveSystemParameters()
   }
 
   DynamicJsonDocument doc(1024);
-  deserializeJson(doc, file);
+  //deserializeJson(doc, file);
   doc["hostname"] = _currentSystemParameters.hostname;
   doc["ftpLogin"] = _currentSystemParameters.ftpLogin;
   doc["ftpPassword"] = _currentSystemParameters.ftpPassword;
 
   // Serialize JSON to file
-  if (serializeJson(doc, file) == 0) {
+  if (serializeJson(doc, file) == 0) 
+  {
       Serial.println(F("Failed to write to file"));
   }
 
@@ -69,39 +91,47 @@ void ParameterProvider::saveSystemParameters()
 void ParameterProvider::createDefaultSystemValues()
 {
   _currentSystemParameters.hostname = "stepperMotor";
-  _currentSystemParameters.hostname = "stepper";
-  _currentSystemParameters.hostname = "stepper";
+  _currentSystemParameters.ftpLogin = "stepper";
+  _currentSystemParameters.ftpPassword = "stepper";
 }
 
 void ParameterProvider::load()
 {
   // Open file for reading
   File file = SPIFFS.open(Filename, "r");
+  if (!file)
+  {
+    Serial.println("Exception during opening configuration file, resetting to factory settings");
+    createDefaultValues();
+    save();
+    return;
+  }
 
   DynamicJsonDocument doc(1024);
 
   DeserializationError error = deserializeJson(doc, file);
   if (error)
   {
+    Serial.println("Exception during deserializing configuration, resetting to factory settings");
     createDefaultValues();
+    save();
     return;
   }
 
-  _currentParameters.counterClockWizeAngleAmplitude = doc["counterClockWizeAngleAmplitude"] | 90;
-  _currentParameters.clockWizeAngleAmplitude = doc["clockWizeAngleAmplitude"] | 90;
-  _currentParameters.currentPosition = doc["currentPosition"] | 0;
-  _currentParameters.reductionRate = doc["reductionRate"] | 64;
-  _currentParameters.motorStepNumber = doc["motorStepNumber"] | 64;
+  _currentParameters.counterClockWizeAngleAmplitude = doc["counterClockWizeAngleAmplitude"] | 90.0;
+  _currentParameters.clockWizeAngleAmplitude = doc["clockWizeAngleAmplitude"] | 90.0;
+  _currentParameters.reductionRate = doc["reductionRate"] | 384.0;
+  _currentParameters.motorStepNumber = doc["motorStepNumber"] | 64.0;
+
+  Serial.printf("reductionRate : %f\n", _currentParameters.reductionRate);
 
   // Close the file (File's destructor doesn't close the file)
   file.close();
+  
 }
 
 void ParameterProvider::save()
 {
-  // Delete existing file, otherwise the configuration is appended to the file
-  SPIFFS.remove(Filename);
-
   // Open file for writing
   File file = SPIFFS.open(Filename, "w");
   if (!file) {
@@ -110,10 +140,9 @@ void ParameterProvider::save()
   }
 
   DynamicJsonDocument doc(1024);
-  deserializeJson(doc, file);
+  //deserializeJson(doc, file);
   doc["counterClockWizeAngleAmplitude"] = _currentParameters.counterClockWizeAngleAmplitude;
   doc["clockWizeAngleAmplitude"] = _currentParameters.clockWizeAngleAmplitude;
-  doc["currentPosition"] = _currentParameters.currentPosition;
   doc["reductionRate"] = _currentParameters.reductionRate;
   doc["motorStepNumber"] = _currentParameters.motorStepNumber;
 
@@ -128,11 +157,10 @@ void ParameterProvider::save()
 
 void ParameterProvider::createDefaultValues()
 {
-  _currentParameters.counterClockWizeAngleAmplitude = 90;
-  _currentParameters.clockWizeAngleAmplitude = 90;
-  _currentParameters.currentPosition = 0;
-  _currentParameters.reductionRate = 64;
-  _currentParameters.motorStepNumber = 64;
+  _currentParameters.counterClockWizeAngleAmplitude = 90.0;
+  _currentParameters.clockWizeAngleAmplitude = 90.0;
+  _currentParameters.reductionRate = 165.0;
+  _currentParameters.motorStepNumber = 64.0;
 }
 
 ParameterProvider::Parameters & ParameterProvider::params()
@@ -153,4 +181,46 @@ ParameterProvider::SystemParameters & ParameterProvider::systemParams()
 const ParameterProvider::SystemParameters & ParameterProvider::systemParams() const 
 {
   return _currentSystemParameters;
+}
+
+void ParameterProvider::loadPosition()
+{
+  File file = SPIFFS.open(PositionFilename, "r");
+  if (!file)
+  {
+    Serial.println("Exception during opening position file, resetting to factory settings");
+    _currentPosition = 0.0;
+    savePosition();
+    return;
+  }
+  String fileContent;
+
+  while (file.available())
+  {
+    fileContent += char(file.read());
+  }
+  file.close();
+  _currentPosition = fileContent.toFloat();
+}
+
+void ParameterProvider::savePosition()
+{
+  File file = SPIFFS.open(PositionFilename, "w");
+  if (!file)
+  {
+    Serial.println("Exception during opening position file");
+    return;
+  }
+  file.printf("%2.3f", _currentPosition);
+  file.close();
+}
+
+void ParameterProvider::position(const double angle)
+{
+  _currentPosition = angle;
+}
+
+double ParameterProvider::position() const
+{
+  return _currentPosition;
 }

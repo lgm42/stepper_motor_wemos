@@ -5,7 +5,6 @@
 #include "Arduino.h"
 
 #include <ESP8266WebServer.h>
-#include <WiFiUdp.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266FtpServer.h>
 #include <ESP8266HTTPUpdateServer.h>
@@ -28,7 +27,6 @@ class HttpServer
 private:
 	ESP8266WebServer _webServer;
 	FtpServer _ftpServer;
-	WiFiUDP _ntpUDP;
 	ParameterProvider & _paramProvider;
     ESP8266HTTPUpdateServer _httpUpdater;
 	StepperManager & _stepper;
