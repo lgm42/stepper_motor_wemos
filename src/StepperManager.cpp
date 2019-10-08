@@ -61,7 +61,11 @@ void StepperManager::onTimer()
             digitalWrite(StepPin, 0);
             //we reduce number of step by 1
             _stepsToObjective--;
-            _paramsProvider.position(_paramsProvider.position() + stepsToAngle(1));
+            if (_direction == kCounterClockWize)
+                _paramsProvider.position(_paramsProvider.position() - stepsToAngle(1));
+            else
+                _paramsProvider.position(_paramsProvider.position() + stepsToAngle(1));
+            
             if (_stepsToObjective == 0)
             {
                 digitalWrite(EnablePin, 1);

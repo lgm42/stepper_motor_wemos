@@ -122,8 +122,7 @@ void ParameterProvider::load()
   _currentParameters.clockWizeAngleAmplitude = doc["clockWizeAngleAmplitude"] | 90.0;
   _currentParameters.reductionRate = doc["reductionRate"] | 384.0;
   _currentParameters.motorStepNumber = doc["motorStepNumber"] | 64.0;
-
-  Serial.printf("reductionRate : %f\n", _currentParameters.reductionRate);
+  _currentParameters.originAngle = doc["originAngle"] | 0.0;
 
   // Close the file (File's destructor doesn't close the file)
   file.close();
@@ -145,6 +144,7 @@ void ParameterProvider::save()
   doc["clockWizeAngleAmplitude"] = _currentParameters.clockWizeAngleAmplitude;
   doc["reductionRate"] = _currentParameters.reductionRate;
   doc["motorStepNumber"] = _currentParameters.motorStepNumber;
+  doc["originAngle"] = _currentParameters.originAngle;
 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
@@ -161,6 +161,7 @@ void ParameterProvider::createDefaultValues()
   _currentParameters.clockWizeAngleAmplitude = 90.0;
   _currentParameters.reductionRate = 165.0;
   _currentParameters.motorStepNumber = 64.0;
+  _currentParameters.originAngle = 0.0;
 }
 
 ParameterProvider::Parameters & ParameterProvider::params()
@@ -223,4 +224,17 @@ void ParameterProvider::position(const double angle)
 double ParameterProvider::position() const
 {
   return _currentPosition;
+}
+
+String ParameterProvider::toJson() const
+{
+	String response = "{\"hostname\":\"" + _currentSystemParameters.hostname + "\", 					\
+	\"ftp-login\":\"" + _currentSystemParameters.ftpLogin + "\",					\
+	\"ftp-password\":\"" + _currentSystemParameters.ftpPassword + "\",					\
+	\"positive-angle-amplitude\":\"" + _currentParameters.clockWizeAngleAmplitude + "\",					\
+	\"negative-angle-amplitude\":\"" + _currentParameters.counterClockWizeAngleAmplitude + "\",					\
+	\"motor-step-number\":\"" + _currentParameters.motorStepNumber + "\",					\
+	\"origin-angle\":\"" + _currentParameters.originAngle + "\",					\
+	\"reduction-rate\":\"" + _currentParameters.reductionRate + "\"}";
+	return response;
 }

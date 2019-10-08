@@ -12,6 +12,7 @@ class ParameterProvider
         double clockWizeAngleAmplitude;
         double reductionRate;
         double motorStepNumber;
+        double originAngle;
     };
 
     typedef struct 
@@ -46,6 +47,8 @@ class ParameterProvider
 
     void position(const double angle);
     double position() const;
+
+    String toJson() const;
 
   private:
     ParameterProvider(const ParameterProvider & copy);

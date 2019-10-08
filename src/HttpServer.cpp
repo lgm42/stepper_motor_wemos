@@ -2,6 +2,7 @@
 // 
 // 
 #include <time.h>
+#include <ArduinoJson.h>
 #include <FS.h>
 
 #include "ParameterProvider.h"
@@ -72,6 +73,37 @@ void HttpServer::setup(void)
         sendOk();
     });
 
+	_webServer.on("/parameters", HTTP_GET, [&]() {
+		Serial.println("REST: " + _webServer.uri());
+		String data = "{ \"parameters\" : " + _paramProvider.toJson() + "}";
+        sendOkAnswerWithParams(data);
+        sendOk();
+    });
+
+	_webServer.on("/parameters",  HTTP_POST, [&]() {
+		DynamicJsonDocument doc(1024);
+
+		DeserializationError error = deserializeJson(doc, (String)_webServer.arg("plain"));
+		if (error)
+		{
+			sendKo("Unable to parse body");
+			return;
+		}
+		
+		if (doc.containsKey("positive-angle-amplitude"))
+			_paramProvider.params().clockWizeAngleAmplitude = doc["positive-angle-amplitude"];
+		if (doc.containsKey("negative-angle-amplitude"))
+			_paramProvider.params().counterClockWizeAngleAmplitude = doc["negative-angle-amplitude"];
+		if (doc.containsKey("motor-step-number"))
+			_paramProvider.params().motorStepNumber = doc["motor-step-number"];
+		if (doc.containsKey("origin-angle"))
+			_paramProvider.params().originAngle = doc["origin-angle"];
+		if (doc.containsKey("reduction-rate"))
+			_paramProvider.params().reductionRate = doc["reduction-rate"];
+
+        sendOk();
+    });
+
 	//called when the url is not defined here
 	//use it to load content from SPIFFS
 	_webServer.onNotFound([&]() {
@@ -100,8 +132,17 @@ String HttpServer::getContentType(String filename)
 
 bool HttpServer::handleFileRead(String path)
 {
-	_webServer.sendHeader("Access-Control-Allow-Origin", "*");
-	
+	//_webServer.sendHeader("Access-Control-Allow-Origin", "*");
+	if (_webServer.method() == HTTP_OPTIONS)
+    {
+        _webServer.sendHeader("Access-Control-Allow-Origin", "*");
+        _webServer.sendHeader("Access-Control-Max-Age", "10000");
+        _webServer.sendHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
+        _webServer.sendHeader("Access-Control-Allow-Headers", "*");
+        _webServer.send(204);
+		return true;
+	}
+
     if (path.endsWith("/")) 
         path += "index.html";
 
@@ -121,6 +162,7 @@ bool HttpServer::handleFileRead(String path)
 
 void HttpServer::sendOk()
 {
+	_webServer.sendHeader("Access-Control-Allow-Origin", "*");
 	_webServer.send(200, "application/json", "{\"result\":true}");
 }
 
@@ -129,6 +171,7 @@ void HttpServer::sendOkAnswerWithParams(const String & params)
 	String data("{\"result\":true, \"data\":");
 	data += params;
 	data += "}";
+	_webServer.sendHeader("Access-Control-Allow-Origin", "*");
 	_webServer.send(200, "application/json", data);
 }
 
@@ -137,6 +180,7 @@ void HttpServer::sendKo(const String & message)
 	String data("{\"result\":false, \"message\":\"");
 	data += message;
 	data += "\"}";
+	_webServer.sendHeader("Access-Control-Allow-Origin", "*");
 	_webServer.send(400, "application/json", data);
 }
 
